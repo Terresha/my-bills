@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17324d">
+<link rel="manifest" href="manifest.webmanifest">
+<title>My Bills</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#182230;background:#f4f7fa}
+*{box-sizing:border-box}body{margin:0}header{background:#17324d;color:white;padding:20px max(16px,calc((100% - 1100px)/2))}
+header h1{margin:0;font-size:1.6rem}header p{margin:5px 0 0;color:#d6e4ef}
+main{max-width:1100px;margin:20px auto;padding:0 14px 40px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.card{background:white;border:1px solid #dce4eb;border-radius:14px;padding:16px;box-shadow:0 2px 7px #132c4010}
+.metric{font-size:1.5rem;font-weight:750;margin-top:5px}.muted{color:#647487;font-size:.9rem}
+h2{font-size:1.15rem;margin:0 0 14px}
+section{margin:14px 0}
+form .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+label{display:block;font-size:.88rem;font-weight:600;color:#344456}
+input,select,textarea{width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5df;border-radius:8px;font:inherit;background:white}
+textarea{min-height:70px}button{border:0;border-radius:8px;padding:10px 13px;font:inherit;font-weight:650;cursor:pointer;background:#17324d;color:white}
+button.secondary{background:#e8eef4;color:#17324d}button.danger{background:#a92f3b}button.small{padding:6px 9px;font-size:.85rem}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input,.toolbar select{max-width:240px;margin-top:0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e5ebf0;vertical-align:top}th{font-size:.82rem;color:#596b7c}
+.tablewrap{overflow-x:auto}.pill{display:inline-block;border-radius:20px;padding:3px 8px;font-size:.78rem;font-weight:700;background:#e9eff5}
+.pill.Paid{background:#dff4e8;color:#17643b}.pill.Overdue{background:#ffe3e4;color:#9b1c27}.pill.Partial{background:#fff0cf;color:#805500}.pill.DueSoon{background:#fff0cf;color:#805500}
+.notice{background:#fff8e6;border:1px solid #f0d9a3;border-radius:10px;padding:12px;font-size:.92rem}
+footer{font-size:.85rem;color:#68798a;margin-top:18px}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}form .fields{grid-template-columns:repeat(2,minmax(0,1fr))}table{min-width:700px}}
+@media(max-width:460px){form .fields{grid-template-columns:1fr}.metric{font-size:1.3rem}}
+</style>
+</head>
+<body>
+<header><h1>My Bills</h1><p>Simple bill tracking • Free to use • Data saved on this device</p></header>
+<main>
+<div class="notice"><strong>Credit card and installment tracking:</strong> Monthly projections use the planned credit-card payment or scheduled installment, not the full statement/plan balance. The separate tracked-balance total shows full card statement and remaining installment balances.<br><br><strong>Reminder limitation:</strong> This free, no-paid-service version can show browser notifications when My Bills is open and running. It cannot guarantee scheduled alerts after the browser is closed. See README for free next steps.</div>
+<section class="grid" aria-label="Bill summary">
+<div class="card"><div class="muted">Outstanding</div><div class="metric" id="outstanding">$0.00</div></div>
+<div class="card"><div class="muted">Paid this month</div><div class="metric" id="paid">$0.00</div></div>
+<div class="card"><div class="muted">Due in 7 days</div><div class="metric" id="soon">$0.00</div></div>
+<div class="card"><div class="muted">Overdue payments</div><div class="metric" id="overdue">$0.00</div></div><div class="card"><div class="muted">Tracked card/installment balances</div><div class="metric" id="tracked">$0.00</div></div>
+</section>
+<section class="card">
+<h2 id="formTitle">Add a bill</h2>
+<form id="billForm">
+<input type="hidden" id="billId">
+<div class="fields">
+<label>Bill / payee name *<input id="name" required placeholder="e.g. Electric bill"></label>
+<label>Bill type<select id="billType"><option value="regular">Regular bill</option><option value="credit">Credit card</option><option value="installment">Installment plan (Afterpay, etc.)</option></select></label>
+<label><span id="amountLabel">Amount due ($) *</span><input id="amount" type="number" min="0" step=".01" required placeholder="0.00"></label>
+<div id="creditFields" style="display:none;grid-column:1/-1"><div class="fields">
+<label>Minimum payment ($)<input id="minimumPayment" type="number" min="0" step=".01" value="0"></label>
+<label>Planned payment this month ($)<input id="plannedPayment" type="number" min="0" step=".01" value="0"></label>
+<label>Statement balance date<input id="statementDate" type="date"></label>
+</div><p class="muted">Statement balance is tracked separately. Only the planned payment is included in monthly projections.</p></div>
+<div id="installmentFields" style="display:none;grid-column:1/-1"><div class="fields">
+<label>Total plan balance remaining ($)<input id="planBalance" type="number" min="0" step=".01" value="0"></label>
+<label>Installment payment ($)<input id="installmentPayment" type="number" min="0" step=".01" value="0"></label>
+<label>Payments remaining<input id="paymentsRemaining" type="number" min="0" step="1" value="0"></label>
+</div><p class="muted">The plan balance is tracked separately. Only the scheduled installment is included in monthly projections.</p></div>
+<label>Due date *<input id="due" type="date" required></label>
+<label>Recurrence<select id="recurrence"><option value="none">One-time</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></label>
+<label>Amount paid ($)<input id="amountPaid" type="number" min="0" step=".01" value="0"></label>
+<label>Payment date<input id="paymentDate" type="date"></label>
+<label>Payment method<select id="method"><option value="">Not specified</option><option>Online</option><option>Automatic payment</option><option>Bank transfer</option><option>Debit card</option><option>Credit card</option><option>Check</option><option>Cash</option><option>Other</option></select></label>
+<label>Reminders<select id="reminders"><option value="on">On (7 days, 3 days, due date)</option><option value="off">Off</option></select></label>
+<label style="grid-column:1/-1">Notes<textarea id="notes" placeholder="Account reference, payment instructions, etc."></textarea></label>
+</div>
+<div class="actions"><button type="submit">Save bill</button><button type="button" class="secondary" id="cancelEdit" hidden>Cancel edit</button><button type="button" class="secondary" id="enableNotifications">Enable/test notifications</button></div>
+</form>
+</section>
+<section class="card">
+<h2>Bill register</h2>
+<div class="toolbar"><input id="search" placeholder="Search bills…"><select id="filter"><option value="all">All statuses</option><option value="Upcoming">Upcoming</option><option value="DueSoon">Due soon</option><option value="Partial">Partially paid</option><option value="Paid">Paid</option><option value="Overdue">Overdue</option></select><select id="sort"><option value="due">Sort by due date</option><option value="name">Sort by name</option><option value="amount">Sort by amount</option></select></div>
+<div class="tablewrap"><table><thead><tr><th>Bill</th><th>Due</th><th>Statement / total amount</th><th>Paid this cycle</th><th>Payment balance</th><th>Status</th><th>Actions</th></tr></thead><tbody id="billRows"></tbody></table></div>
+<div class="actions"><button class="secondary" id="exportBtn">Export backup</button><button class="secondary" id="importBtn">Import backup</button><input id="importFile" type="file" accept="application/json" hidden></div>
+</section>
+<section class="card"><h2>Reminder check</h2><p class="muted">When this page is open, My Bills checks outstanding bills and can display a notification for bills due in 7 days, 3 days, or today. Fully paid bills are excluded. Browser notifications must be permitted.</p><div id="reminderStatus" class="muted">Notifications not checked yet.</div></section>
+<footer>Privacy note: this version stores your bills in this browser only. It does not upload your data. Export a backup regularly, and do not use a shared/public device.</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const KEY='myBillsFreeV1';
+let bills=[];
+try { bills=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(bills)) bills=[]; } catch { bills=[]; }
+const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(n)||0);
+const isoToday=()=>{const d=new Date();d.setHours(0,0,0,0);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const daysUntil=s=>{const d=new Date(s+'T00:00:00');return Math.round((d-new Date(isoToday()+'T00:00:00'))/86400000)};
+function scheduledAmount(b){if(b.billType==='credit')return Number(b.plannedPayment||0);if(b.billType==='installment')return Number(b.installmentPayment||0);return Number(b.amount||0)}
+function balance(b){return Math.max(0,scheduledAmount(b)-Number(b.amountPaid||0))}
+function trackedBalance(b){if(b.billType==='credit')return Number(b.amount||0);if(b.billType==='installment')return Number(b.planBalance||0);return 0}
+function status(b){if(balance(b)<=0)return 'Paid';if(Number(b.amountPaid||0)>0)return 'Partial';let d=daysUntil(b.due);if(d<0)return 'Overdue';if(d<=3)return 'DueSoon';return 'Upcoming'}
+function save(){localStorage.setItem(KEY,JSON.stringify(bills));render()}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+ const month=isoToday().slice(0,7);
+ $('outstanding').textContent=money(bills.reduce((s,b)=>s+balance(b),0));
+ $('paid').textContent=money(bills.filter(b=>(b.paymentDate||'').startsWith(month)).reduce((s,b)=>s+Number(b.amountPaid||0),0));
+ $('soon').textContent=money(bills.filter(b=>balance(b)>0&&daysUntil(b.due)>=0&&daysUntil(b.due)<=7).reduce((s,b)=>s+balance(b),0));
+ $('overdue').textContent=money(bills.filter(b=>balance(b)>0&&daysUntil(b.due)<0).reduce((s,b)=>s+balance(b),0));
+ $('tracked').textContent=money(bills.reduce((s,b)=>s+trackedBalance(b),0));
+ const q=$('search').value.toLowerCase(), f=$('filter').value, sort=$('sort').value;
+ let list=bills.filter(b=>(b.name+' '+(b.notes||'')).toLowerCase().includes(q)&&(f==='all'||status(b)===f));
+ list.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='amount'?balance(b)-balance(a):(a.due||'').localeCompare(b.due||''));
+ $('billRows').innerHTML=list.map(b=>`<tr><td><strong>${escapeHtml(b.name)}</strong><br><span class="muted">${escapeHtml(({regular:'Regular bill',credit:'Credit card',installment:'Installment plan'}[b.billType||'regular']))} · ${escapeHtml(b.recurrence==='none'?'One-time':b.recurrence)}</span>${b.notes?'<br><span class="muted">'+escapeHtml(b.notes)+'</span>':''}</td><td>${escapeHtml(b.due||'')}</td><td>${money(b.amount)}</td><td>${money(b.amountPaid)}</td><td><strong>${money(balance(b))}</strong></td><td><span class="pill ${status(b)}">${status(b)==='DueSoon'?'Due soon':status(b)}</span></td><td><div class="actions"><button class="small" onclick="editBill('${b.id}')">Edit</button><button class="small secondary" onclick="payBill('${b.id}')">Record payment</button><button class="small danger" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr>`).join('')||'<tr><td colspan="7" class="muted">No bills match. Add a bill above to get started.</td></tr>';
+}
+function resetForm(){ $('billForm').reset();$('billId').value='';$('amountPaid').value='0';$('formTitle').textContent='Add a bill';$('cancelEdit').hidden=true; }
+$('billForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const id=$('billId').value||crypto.randomUUID();
+ const prev=bills.find(b=>b.id===id);
+ const b={id,name:$('name').value.trim(),billType:$('billType').value,amount:Number($('amount').value),due:$('due').value,recurrence:$('recurrence').value,amountPaid:Number($('amountPaid').value||0),paymentDate:$('paymentDate').value,method:$('method').value,reminders:$('reminders').value,notes:$('notes').value.trim(),minimumPayment:Number($('minimumPayment').value||0),plannedPayment:Number($('plannedPayment').value||0),statementDate:$('statementDate').value,planBalance:Number($('planBalance').value||0),installmentPayment:Number($('installmentPayment').value||0),paymentsRemaining:Number($('paymentsRemaining').value||0),notified:prev?.notified||{}};
+ if(b.billType==='credit' && (!Number.isFinite(b.plannedPayment)||b.plannedPayment<0)){alert('Enter a valid planned payment of $0.00 or more.');return}
+ if(b.billType==='installment' && b.installmentPayment<=0){alert('Enter the installment payment amount.');return}
+ if(b.amountPaid>=scheduledAmount(b) && scheduledAmount(b)>0) b.amountPaid=scheduledAmount(b);
+ const i=bills.findIndex(x=>x.id===id); if(i>=0)bills[i]=b;else bills.push(b);
+ // For new recurring bills, make the next occurrence immediately so the future bill is visible.
+ if(!prev&&b.recurrence!=='none'&&b.billType==='regular'){const next=new Date(b.due+'T12:00:00');next.setMonth(next.getMonth()+(b.recurrence==='monthly'?1:b.recurrence==='quarterly'?3:12));bills.push({...b,id:crypto.randomUUID(),due:`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`,amountPaid:0,paymentDate:'',notified:{}})}
+ save();resetForm();
+});
+window.editBill=id=>{const b=bills.find(x=>x.id===id);if(!b)return;for(const k of ['id','name','billType','amount','due','recurrence','amountPaid','paymentDate','method','reminders','notes','minimumPayment','plannedPayment','statementDate','planBalance','installmentPayment','paymentsRemaining'])$(k==='id'?'billId':k).value=b[k]??(['amountPaid','minimumPayment','plannedPayment','planBalance','installmentPayment','paymentsRemaining'].includes(k)?0:'');updateTypeFields();$('formTitle').textContent='Edit bill';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+window.deleteBill=id=>{if(confirm('Delete this bill?')){bills=bills.filter(b=>b.id!==id);save()}};
+window.payBill=id=>{const b=bills.find(x=>x.id===id);if(!b)return;const val=prompt(`Enter total amount paid so far for this bill/payment for ${b.name} (balance ${money(balance(b))}):`,String(scheduledAmount(b)));if(val===null)return;const n=Number(val);if(!Number.isFinite(n)||n<0){alert('Enter a valid amount.');return}b.amountPaid=Math.min(n,scheduledAmount(b));b.paymentDate=isoToday();save()};
+$('cancelEdit').onclick=resetForm;
+function updateTypeFields(){
+ const t=$('billType').value;
+ $('creditFields').style.display=t==='credit'?'block':'none';
+ $('installmentFields').style.display=t==='installment'?'block':'none';
+ $('amountLabel').textContent=t==='credit'?'Statement balance ($) *':t==='installment'?'Original / total purchase amount ($) *':'Amount due ($) *';
+ $('plannedPayment').required=t==='credit';
+ $('installmentPayment').required=t==='installment';
+}
+$('billType').addEventListener('change',updateTypeFields);updateTypeFields();
+['search','filter','sort'].forEach(id=>$(id).addEventListener('input',render));
+$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),bills},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-bills-backup.json';a.click();URL.revokeObjectURL(a.href)};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());const arr=Array.isArray(d)?d:d.bills;if(!Array.isArray(arr))throw Error();if(confirm(`Replace current bills with ${arr.length} imported bills?`)){bills=arr;save()}}catch{alert('That file does not look like a valid My Bills backup.')}e.target.value=''};
+$('enableNotifications').onclick=async()=>{if(!('Notification'in window)){alert('This browser does not support notifications.');return}const p=await Notification.requestPermission();$('reminderStatus').textContent='Notification permission: '+p+'.';if(p==='granted'){new Notification('My Bills notifications are enabled',{body:'Reminder test. Keep My Bills open for its scheduled checks in this version.'});checkReminders()}};
+function checkReminders(){
+ if(!('Notification'in window)||Notification.permission!=='granted')return;
+ let changed=false, today=isoToday();
+ for(const b of bills){if(b.reminders==='off'||balance(b)<=0)continue;const d=daysUntil(b.due);let key=d===7?'7':d===3?'3':d===0?'0':null;if(!key)continue;b.notified=b.notified||{};const marker=b.due+':'+key;if(b.notified[marker])continue;
+ try{new Notification(d===0?'Bill due today':`Bill due in ${d} days`,{body:`${b.name} — ${money(balance(b))} remaining`});b.notified[marker]=true;changed=true}catch{}
+ }
+ if(changed)localStorage.setItem(KEY,JSON.stringify(bills));
+ $('reminderStatus').textContent='Last checked: '+new Date().toLocaleString()+'. Reminders only run while this page is open.';
+}
+if('serviceWorker'in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+render();checkReminders();setInterval(checkReminders,60*60*1000);
+</script>
+</body></html>

@@ -1,0 +1,9 @@
+{
+  "name": "My Bills",
+  "short_name": "My Bills",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#17324d",
+  "icons": []
+}
