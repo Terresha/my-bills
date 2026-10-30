@@ -59,7 +59,7 @@ footer{font-size:.85rem;color:#68798a;margin-top:18px}
 <input type="hidden" id="billId">
 <div class="fields">
 <label>Bill / payee name *<input id="name" required placeholder="e.g. Electric bill"></label>
-<label>Bill type<select id="billType"><option value="regular">Regular bill</option><option value="credit">Credit card</option><option value="installment">Installment plan (Afterpay, etc.)</option></select></label>
+<label>Bill type<select id="billType"><option value="regular">Recurring fixed payment / regular bill (car, insurance, utilities)</option><option value="credit">Credit card / revolving account</option><option value="installment">Payoff installment plan (Afterpay, Klarna, etc.)</option></select></label>
 <label><span id="amountLabel">Amount due ($) *</span><input id="amount" type="number" min="0" step=".01" required placeholder="0.00"></label>
 <div id="creditFields" style="display:none;grid-column:1/-1"><div class="fields">
 <label>Minimum payment ($)<input id="minimumPayment" type="number" min="0" step=".01" value="0"></label>
@@ -70,9 +70,10 @@ footer{font-size:.85rem;color:#68798a;margin-top:18px}
 <label>Total plan balance remaining ($)<input id="planBalance" type="number" min="0" step=".01" value="0"></label>
 <label>Installment payment ($)<input id="installmentPayment" type="number" min="0" step=".01" value="0"></label>
 <label>Payments remaining<input id="paymentsRemaining" type="number" min="0" step="1" value="0"></label>
-</div><p class="muted">The plan balance is tracked separately. Only the scheduled installment is included in monthly projections.</p></div>
+</div><p class="muted">This is a payoff plan, not a recurring loan or insurance bill. Each payment reduces the remaining plan balance. The scheduled installment advances to the next due date; the plan moves to History only when its remaining balance reaches $0.00.</p></div>
 <label>Due date *<input id="due" type="date" required></label>
 <label>Recurrence<select id="recurrence"><option value="none">One-time</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></label>
+<div id="fixedPaymentHelp" class="muted" style="grid-column:1/-1">Recurring fixed payments (such as car payments, insurance, and utilities) stay active after each payment. Once the scheduled amount is paid, the due date advances and the next cycle resets. They are separate from payoff installment plans such as Afterpay.</div>
 <label>Amount paid ($)<input id="amountPaid" type="number" min="0" step=".01" value="0"></label>
 <label>Payment date<input id="paymentDate" type="date"></label>
 <label>Payment method<select id="method"><option value="">Not specified</option><option>Online</option><option>Automatic payment</option><option>Bank transfer</option><option>Debit card</option><option>Credit card</option><option>Check</option><option>Cash</option><option>Other</option></select></label>
@@ -84,14 +85,11 @@ footer{font-size:.85rem;color:#68798a;margin-top:18px}
 </section>
 <section class="card">
 <h2>Bill register</h2>
-<div class="toolbar"><input id="search" placeholder="Search bills…"><select id="filter"><option value="all">All statuses</option><option value="Upcoming">Upcoming</option><option value="DueSoon">Due soon</option><option value="Partial">Partially paid</option><option value="Paid">Paid</option><option value="Overdue">Overdue</option></select><select id="sort"><option value="due">Sort by due date</option><option value="name">Sort by name</option><option value="amount">Sort by amount</option></select></div>
+<div class="toolbar"><input id="search" placeholder="Search bills…"><select id="filter"><option value="all">All statuses</option><option value="Upcoming">Upcoming</option><option value="DueSoon">Due soon</option><option value="Partial">Partially paid</option><option value="Paid">Paid</option><option value="Overdue">Overdue</option><option value="History">History</option></select><select id="sort"><option value="due">Sort by due date</option><option value="name">Sort by name</option><option value="amount">Sort by amount</option></select></div>
 <div class="tablewrap"><table><thead><tr><th>Bill</th><th>Due</th><th>Statement / total amount</th><th>Paid this cycle</th><th>Payment balance</th><th>Status</th><th>Actions</th></tr></thead><tbody id="billRows"></tbody></table></div>
 <div class="actions"><button class="secondary" id="exportBtn">Export backup</button><button class="secondary" id="importBtn">Import backup</button><input id="importFile" type="file" accept="application/json" hidden></div>
 </section>
-<section class="card">
-<h2>History</h2><p class="muted">Paid-off one-time bills and completed installment plans are kept here for your records and removed from the active bill register.</p>
-<div class="tablewrap"><table><thead><tr><th>Bill</th><th>Due</th><th>Original / total amount</th><th>Paid this cycle</th><th>Remaining plan balance</th><th>Status</th><th>Actions</th></tr></thead><tbody id="historyRows"></tbody></table></div>
-</section>
+<section class="card"><h2>History</h2><p class="muted">Only fully paid payoff installment plans and completed one-time bills are kept here. Recurring fixed payments and credit cards remain active after each completed cycle.</p><div class="tablewrap"><table><thead><tr><th>Bill</th><th>Due / completed</th><th>Total amount</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead><tbody id="historyRows"></tbody></table></div>
 <section class="card"><h2>Reminder check</h2><p class="muted">When this page is open, My Bills checks outstanding bills and can display a notification for bills due in 7 days, 3 days, or today. Fully paid bills are excluded. Browser notifications must be permitted.</p><div id="reminderStatus" class="muted">Notifications not checked yet.</div></section>
 <footer>Privacy note: this version stores your bills in this browser only. It does not upload your data. Export a backup regularly, and do not use a shared/public device.</footer>
 </main>
@@ -103,51 +101,47 @@ try { bills=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(bills
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(n)||0);
 const isoToday=()=>{const d=new Date();d.setHours(0,0,0,0);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const daysUntil=s=>{const d=new Date(s+'T00:00:00');return Math.round((d-new Date(isoToday()+'T00:00:00'))/86400000)};
-function scheduledAmount(b){if(b.billType==='credit')return Number(b.plannedPayment||0);if(b.billType==='installment')return Number(b.installmentPayment||0);return Number(b.amount||0)}
+function scheduledAmount(b){if(b.billType==='credit')return Number(b.minimumPayment)>0?Number(b.minimumPayment):Number(b.plannedPayment||0);if(b.billType==='installment')return Number(b.installmentPayment||0);return Number(b.amount||0)}
 function balance(b){return Math.max(0,scheduledAmount(b)-Number(b.amountPaid||0))}
 function trackedBalance(b){if(b.billType==='credit')return Number(b.amount||0);if(b.billType==='installment')return Number(b.planBalance||0);return 0}
-function status(b){if(b.billType==='installment'&&Number(b.planBalance||0)<=0)return 'Paid';if(balance(b)<=0)return 'Paid';if(Number(b.amountPaid||0)>0)return 'Partial';let d=daysUntil(b.due);if(d<0)return 'Overdue';if(d<=3)return 'DueSoon';return 'Upcoming'}
-function shouldArchive(b){if(b.billType==='installment')return Number(b.planBalance||0)<=0;return (b.billType||'regular')==='regular'&&b.recurrence==='none'&&balance(b)<=0}
+function status(b){if(b.archived)return 'History';if(balance(b)<=0)return 'Paid';if(Number(b.amountPaid||0)>0)return 'Partial';let d=daysUntil(b.due);if(d<0)return 'Overdue';if(d<=3)return 'DueSoon';return 'Upcoming'}
 function save(){localStorage.setItem(KEY,JSON.stringify(bills));render()}
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(){
  const month=isoToday().slice(0,7);
- // Migrate already-paid one-time bills/completed plans into History on load.
- let migrated=false;
- for(const b of bills){if(!b.archived&&shouldArchive(b)){b.archived=true;migrated=true}}
- if(migrated)localStorage.setItem(KEY,JSON.stringify(bills));
- const current=bills.filter(b=>!b.archived);
- $('outstanding').textContent=money(current.reduce((s,b)=>s+balance(b),0));
- $('paid').textContent=money(current.filter(b=>(b.paymentDate||'').startsWith(month)).reduce((s,b)=>s+Number(b.amountPaid||0),0));
- $('soon').textContent=money(current.filter(b=>balance(b)>0&&daysUntil(b.due)>=0&&daysUntil(b.due)<=7).reduce((s,b)=>s+balance(b),0));
- $('overdue').textContent=money(current.filter(b=>balance(b)>0&&daysUntil(b.due)<0).reduce((s,b)=>s+balance(b),0));
- $('tracked').textContent=money(current.reduce((s,b)=>s+trackedBalance(b),0));
+ $('outstanding').textContent=money(bills.filter(b=>!b.archived).reduce((s,b)=>s+balance(b),0));
+ $('paid').textContent=money(bills.filter(b=>!b.archived&&(b.paymentDate||'').startsWith(month)).reduce((s,b)=>s+Number(b.amountPaid||0),0));
+ $('soon').textContent=money(bills.filter(b=>!b.archived&&balance(b)>0&&daysUntil(b.due)>=0&&daysUntil(b.due)<=7).reduce((s,b)=>s+balance(b),0));
+ $('overdue').textContent=money(bills.filter(b=>!b.archived&&balance(b)>0&&daysUntil(b.due)<0).reduce((s,b)=>s+balance(b),0));
+ $('tracked').textContent=money(bills.filter(b=>!b.archived).reduce((s,b)=>s+trackedBalance(b),0));
  const q=$('search').value.toLowerCase(), f=$('filter').value, sort=$('sort').value;
- let list=current.filter(b=>(b.name+' '+(b.notes||'')).toLowerCase().includes(q)&&(f==='all'||status(b)===f));
+ let list=bills.filter(b=>(b.archived ? f==='History' : f!=='History')&&(b.name+' '+(b.notes||'')).toLowerCase().includes(q)&&(f==='all'||status(b)===f));
  list.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='amount'?balance(b)-balance(a):(a.due||'').localeCompare(b.due||''));
- const row=b=>`<tr><td><strong>${escapeHtml(b.name)}</strong><br><span class="muted">${escapeHtml(({regular:'Regular bill',credit:'Credit card',installment:'Installment plan'}[b.billType||'regular']))} · ${escapeHtml(b.recurrence==='none'?'One-time':b.recurrence)}</span>${b.notes?'<br><span class="muted">'+escapeHtml(b.notes)+'</span>':''}</td><td>${escapeHtml(b.due||'')}</td><td>${money(b.amount)}</td><td>${money(b.amountPaid)}</td><td><strong>${money(b.billType==='installment'?b.planBalance:balance(b))}</strong></td><td><span class="pill ${status(b)}">${status(b)==='DueSoon'?'Due soon':status(b)}</span></td>`;
- $('billRows').innerHTML=list.map(b=>row(b)+`<td><div class="actions"><button class="small" onclick="editBill('${b.id}')">Edit</button><button class="small secondary" onclick="payBill('${b.id}')">Record payment</button><button class="small danger" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr>`).join('')||'<tr><td colspan="7" class="muted">No bills match. Add a bill above to get started.</td></tr>';
- const archived=bills.filter(b=>b.archived);
- $('historyRows').innerHTML=archived.map(b=>row(b)+`<td><div class="actions"><button class="small" onclick="editBill('${b.id}')">Edit</button><button class="small danger" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr>`).join('')||'<tr><td colspan="7" class="muted">No completed bills in history yet.</td></tr>';
+ $('billRows').innerHTML=list.map(b=>`<tr><td><strong>${escapeHtml(b.name)}</strong><br><span class="muted">${escapeHtml(({regular:'Recurring fixed payment',credit:'Credit card / revolving',installment:'Payoff installment plan'}[b.billType||'regular']))} · ${escapeHtml(b.recurrence==='none'?'One-time':b.recurrence)}</span>${b.notes?'<br><span class="muted">'+escapeHtml(b.notes)+'</span>':''}</td><td>${escapeHtml(b.due||'')}</td><td>${money(b.amount)}</td><td>${money(b.amountPaid)}</td><td><strong>${money(balance(b))}</strong></td><td><span class="pill ${status(b)}">${status(b)==='DueSoon'?'Due soon':status(b)}</span></td><td><div class="actions"><button class="small" onclick="editBill('${b.id}')">Edit</button>${b.archived?`<button class="small secondary" onclick="restoreBill('${b.id}')">Restore</button>`:`<button class="small secondary" onclick="payBill('${b.id}')">Record payment</button>`}<button class="small danger" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr>`).join('')||'<tr><td colspan="7" class="muted">No bills match. Add a bill above to get started.</td></tr>';
+ $('historyRows').innerHTML=bills.filter(b=>b.archived).map(b=>`<tr><td><strong>${escapeHtml(b.name)}</strong><br><span class="muted">${escapeHtml(({regular:'Recurring fixed payment',credit:'Credit card / revolving',installment:'Payoff installment plan'}[b.billType||'regular']))}</span></td><td>${escapeHtml(b.completedDate||b.paymentDate||b.due||'')}</td><td>${money(b.amount)}</td><td>${money(b.amountPaid||b.amount||0)}</td><td><span class="pill History">History</span></td><td><button class="small secondary" onclick="restoreBill('${b.id}')">Restore</button> <button class="small danger" onclick="deleteBill('${b.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No completed bills yet.</td></tr>'; 
 }
 function resetForm(){ $('billForm').reset();$('billId').value='';$('amountPaid').value='0';$('formTitle').textContent='Add a bill';$('cancelEdit').hidden=true; }
 $('billForm').addEventListener('submit',e=>{
  e.preventDefault();
  const id=$('billId').value||crypto.randomUUID();
  const prev=bills.find(b=>b.id===id);
- const b={id,name:$('name').value.trim(),billType:$('billType').value,amount:Number($('amount').value),due:$('due').value,recurrence:$('recurrence').value,amountPaid:Number($('amountPaid').value||0),paymentDate:$('paymentDate').value,method:$('method').value,reminders:$('reminders').value,notes:$('notes').value.trim(),minimumPayment:Number($('minimumPayment').value||0),plannedPayment:Number($('plannedPayment').value||0),statementDate:$('statementDate').value,planBalance:Number($('planBalance').value||0),installmentPayment:Number($('installmentPayment').value||0),paymentsRemaining:Number($('paymentsRemaining').value||0),notified:prev?.notified||{},archived:prev?.archived||false};
+ const b={id,name:$('name').value.trim(),billType:$('billType').value,amount:Number($('amount').value),due:$('due').value,recurrence:$('recurrence').value,amountPaid:Number($('amountPaid').value||0),paymentDate:$('paymentDate').value,method:$('method').value,reminders:$('reminders').value,notes:$('notes').value.trim(),paymentHistory:prev?.paymentHistory||[],minimumPayment:Number($('minimumPayment').value||0),plannedPayment:Number($('plannedPayment').value||0),statementDate:$('statementDate').value,planBalance:Number($('planBalance').value||0),installmentPayment:Number($('installmentPayment').value||0),paymentsRemaining:Number($('paymentsRemaining').value||0),notified:prev?.notified||{},archived:prev?.archived||false,completedDate:prev?.completedDate||''};
  if(b.billType==='credit' && (!Number.isFinite(b.plannedPayment)||b.plannedPayment<0)){alert('Enter a valid planned payment of $0.00 or more.');return}
  if(b.billType==='installment' && b.installmentPayment<=0){alert('Enter the installment payment amount.');return}
  if(b.amountPaid>=scheduledAmount(b) && scheduledAmount(b)>0) b.amountPaid=scheduledAmount(b);
- b.archived=shouldArchive(b);
  const i=bills.findIndex(x=>x.id===id); if(i>=0)bills[i]=b;else bills.push(b);
- // For new recurring bills, make the next occurrence immediately so the future bill is visible.
- if(!prev&&b.recurrence!=='none'&&b.billType==='regular'){const next=new Date(b.due+'T12:00:00');next.setMonth(next.getMonth()+(b.recurrence==='monthly'?1:b.recurrence==='quarterly'?3:12));bills.push({...b,id:crypto.randomUUID(),due:`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`,amountPaid:0,paymentDate:'',notified:{}})}
  save();resetForm();
 });
 window.editBill=id=>{const b=bills.find(x=>x.id===id);if(!b)return;for(const k of ['id','name','billType','amount','due','recurrence','amountPaid','paymentDate','method','reminders','notes','minimumPayment','plannedPayment','statementDate','planBalance','installmentPayment','paymentsRemaining'])$(k==='id'?'billId':k).value=b[k]??(['amountPaid','minimumPayment','plannedPayment','planBalance','installmentPayment','paymentsRemaining'].includes(k)?0:'');updateTypeFields();$('formTitle').textContent='Edit bill';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
 window.deleteBill=id=>{if(confirm('Delete this bill?')){bills=bills.filter(b=>b.id!==id);save()}};
-window.payBill=id=>{const b=bills.find(x=>x.id===id);if(!b)return;const val=prompt(`Enter total amount paid so far for this bill/payment for ${b.name} (balance ${money(balance(b))}):`,String(scheduledAmount(b)));if(val===null)return;const n=Number(val);if(!Number.isFinite(n)||n<0){alert('Enter a valid amount.');return}b.amountPaid=Math.min(n,scheduledAmount(b));b.paymentDate=isoToday();save()};
+function recordCycle(b,paid){b.paymentHistory=Array.isArray(b.paymentHistory)?b.paymentHistory:[];b.paymentHistory.push({due:b.due||'',paidDate:isoToday(),amount:Number(paid||0),type:b.billType||'regular'});}
+function advanceDueDate(b){const d=new Date((b.due||isoToday())+'T12:00:00');const months=b.recurrence==='monthly'?1:b.recurrence==='quarterly'?3:b.recurrence==='yearly'?12:0;if(!months)return false;const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+months);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));b.due=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;b.amountPaid=0;b.paymentDate='';b.notified={};return true}
+window.payBill=id=>{const b=bills.find(x=>x.id===id);if(!b||b.archived)return;const due=balance(b);const target=b.billType==='credit'?(Number(b.minimumPayment)>0?Number(b.minimumPayment):Number(b.plannedPayment||0)):scheduledAmount(b);const promptText=b.billType==='installment'?`Enter installment payment amount for ${b.name}. Remaining plan balance: ${money(b.planBalance)}. Scheduled installment: ${money(b.installmentPayment)}.`:b.billType==='credit'?`Enter payment amount for ${b.name}. Minimum payment to satisfy this cycle: ${money(target)}. Current tracked balance: ${money(b.amount)}.`:`Enter amount paid now for ${b.name} (remaining this cycle: ${money(due)}):`;const val=prompt(promptText,String(Math.max(0,target-previousPaid)||target||scheduledAmount(b)));if(val===null)return;const n=Number(val);if(!Number.isFinite(n)||n<=0){alert('Enter a payment greater than $0.00.');return}const previousPaid=Number(b.amountPaid||0);b.paymentDate=isoToday();b.method=b.method||'';
+ if(b.billType==='installment'){const plan=Math.max(0,Number(b.planBalance||0));const applied=Math.min(n,plan);b.planBalance=Math.max(0,Math.round((plan-applied)*100)/100);b.amountPaid=Math.min(Number(b.installmentPayment||0),previousPaid+n);if(b.planBalance<=0){b.planBalance=0;b.archived=true;b.completedDate=isoToday();b.amountPaid=applied;}else if(b.recurrence&&b.recurrence!=='none'&&b.amountPaid>=scheduledAmount(b)){recordCycle(b,b.amountPaid);if(Number(b.paymentsRemaining)>0)b.paymentsRemaining=Math.max(0,Number(b.paymentsRemaining)-1);advanceDueDate(b);}}
+ else if(b.billType==='credit'){const applied=Math.min(n,Math.max(0,Number(b.amount||0)));b.amount=Math.max(0,Math.round((Number(b.amount||0)-applied)*100)/100);b.amountPaid=previousPaid+n;const criterion=Number(b.minimumPayment)>0?Number(b.minimumPayment):Number(b.plannedPayment||0);if(criterion>0&&b.amountPaid>=criterion){recordCycle(b,b.amountPaid);advanceDueDate(b);}}
+ else {b.amountPaid=Math.min(scheduledAmount(b),previousPaid+n);if(balance(b)<=0){if(b.recurrence&&b.recurrence!=='none'){recordCycle(b,b.amountPaid);advanceDueDate(b)}else{b.archived=true;b.completedDate=isoToday();recordCycle(b,b.amountPaid)}}}
+ save()};
+window.restoreBill=id=>{const b=bills.find(x=>x.id===id);if(!b)return;b.archived=false;b.completedDate='';if(b.billType==='installment'&&Number(b.planBalance)<=0){alert('This installment plan has a $0.00 balance. Edit its remaining balance before restoring it.');b.archived=true;return}save()};
 $('cancelEdit').onclick=resetForm;
 function updateTypeFields(){
  const t=$('billType').value;
