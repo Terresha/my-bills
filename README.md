@@ -1,19 +1,20 @@
-MY BILLS — INSTALLABLE WEB APP PACKAGE (v3)
+MY BILLS — HISTORY FEATURE UPDATE
 
 UPLOAD INSTRUCTIONS FOR GITHUB PAGES
 1. Extract this ZIP on your computer.
-2. Upload the CONTENTS of this folder to the root of your existing GitHub repository, replacing the older index.html, manifest.webmanifest, and sw.js. Include the icons folder and its two PNG files. Do not upload the ZIP itself.
+2. Upload the CONTENTS of this folder to the root of your existing GitHub repository, replacing the older index.html, manifest.webmanifest, and sw.js. Include the icons folder and its two PNG files.
 3. Commit the changes. GitHub Pages should publish from main / (root).
-4. Open https://YOUR-USERNAME.github.io/my-bills/ in Chrome on Android. Refresh the page after deployment. Use Chrome's menu and look for Install app or the equivalent install option; wording varies by device/browser.
+4. Open https://terresha.github.io/my-bills/ and refresh the page after deployment.
 
-INCLUDED
-- index.html: bill tracker
-- manifest.webmanifest: app identity and install metadata
-- sw.js: offline caching service worker
-- icons/: 192px and 512px install icons
+HISTORY FEATURE
+- Paid one-time regular bills are automatically moved to History.
+- Installment plans remain in the active register while their remaining plan balance is above $0.
+- When an installment plan's remaining plan balance is changed to $0 and saved, it is moved to History.
+- Credit cards and recurring regular bills stay in the active register.
+- History records are retained in the app data and included in Export Backup. They can be edited or deleted from History.
+- When updating an installment plan, update the “Total plan balance remaining” field to the current amount. The app does not automatically reduce this total when you record an installment payment.
 
-IMPORTANT LIMITATIONS
-- This improves installability but cannot guarantee that every browser/device will offer installation. Browser requirements and menu wording vary.
-- Data remains local to each browser/device. Installing the app does not synchronize bills. Use Export Backup / Import Backup to transfer a copy. Do not place backups in a public repository.
-- Notifications are checked while the app is open. This package does not provide guaranteed scheduled reminders while closed.
-- The app is free to host on GitHub Pages in a public repository, but repository source files are publicly visible. Never upload private bill backups or credentials.
+DATA AND PRIVACY
+- Data remains local to each browser/device. Installing the app does not synchronize bills. Use Export Backup / Import Backup to transfer a copy.
+- Notifications are checked while the app is open; this package does not provide guaranteed scheduled reminders while closed.
+- GitHub Pages source files are publicly visible. Never upload private bill backups or credentials.
