@@ -97,7 +97,15 @@ footer{font-size:.85rem;color:#68798a;margin-top:18px}
 const $ = id => document.getElementById(id);
 const KEY='myBillsTestV1';
 let bills=[];
-try { bills=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(bills)) bills=[]; } catch { bills=[]; }
+try {
+  const current=JSON.parse(localStorage.getItem(KEY)||'[]');
+  const original=JSON.parse(localStorage.getItem('myBillsFreeV1')||'[]');
+  if(Array.isArray(current)&&current.length) bills=current;
+  else if(Array.isArray(original)&&original.length) {
+    bills=original;
+    localStorage.setItem(KEY,JSON.stringify(bills));
+  } else if(Array.isArray(current)) bills=current;
+} catch { bills=[]; }
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(n)||0);
 const isoToday=()=>{const d=new Date();d.setHours(0,0,0,0);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const daysUntil=s=>{const d=new Date(s+'T00:00:00');return Math.round((d-new Date(isoToday()+'T00:00:00'))/86400000)};
