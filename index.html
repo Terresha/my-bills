@@ -232,7 +232,7 @@ function checkReminders(){
  if(changed)localStorage.setItem(KEY,JSON.stringify(bills));
  $('reminderStatus').textContent='Last checked: '+new Date().toLocaleString()+'. Reminders only run while this page is open.';
 }
-if('serviceWorker'in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker registration failed',err));
+// Service worker intentionally disabled in this test copy to avoid affecting the original app's cache.
 render();checkReminders();setInterval(checkReminders,60*60*1000);
 </script>
 </body></html>
